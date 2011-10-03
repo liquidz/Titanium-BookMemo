@@ -35,8 +35,10 @@
 		intent.putExtra("SCAN_MODE", "ONE_D_MODE");
 
         Ti.Android.currentActivity.startActivityForResult(intent, function(e){
-			var isbn = e.intent.getStringExtra("SCAN_RESULT");
-			callback(isbn.replace("-", ""));
+			if(e.intent){
+				var isbn = e.intent.getStringExtra("SCAN_RESULT");
+				callback(isbn.replace("-", ""));
+			}
 		});
 	};
 

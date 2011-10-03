@@ -1,5 +1,58 @@
 (function(){
 
+	app.addBookDialog = function(data){
+		var dialog;
+
+		var view = Ti.UI.createView({ width: "100%", height: "100%" });
+
+		view.add(Ti.UI.createImageView({
+			image: data.thumbnail,
+			top: 0, left: 0,
+			width: "80dp", height: "120dp"
+		}));
+
+		var comment = Ti.UI.createTextField({
+			top: "125dp", left: 0,
+			height: "50dp", width: "250dp",
+			font: { fontSize: "20dp" },
+			hintText: "コメント"
+		});
+		view.add(comment);
+		var ok = Ti.UI.createButton({
+			top: "180dp", left: 0,
+			title: "OK",
+			width: "120dp", height: "60dp"
+		});
+		var cancel = Ti.UI.createButton({
+			top: "180dp", left: "130dp",
+			title: "Cancel",
+			width: "120dp", height: "60dp"
+		});
+
+		ok.addEventListener("click", function(){
+			app.db.execute("insert into book (isbn, title, author, publisher, thumbnail, comment) values(?, ?, ?, ?, ?, ?)",
+				data.isbn, data.title, data.author, data.publisher, data.thumbnail, comment.value);
+	
+			data.id = app.db.lastInsertRowId;
+			var row = app.createRow(data);
+			app.tableView.insertRowBefore(0, row);
+			dialog.hide();
+		});
+
+		cancel.addEventListener("click", function(){
+			dialog.hide();
+		});
+
+		view.add(ok);
+		view.add(cancel);
+
+		dialog = Ti.UI.createOptionDialog({
+			androidView: view,
+			title: "hello"
+		});
+		dialog.show();
+	};
+
 	app.createBookWindow = function(bookId){
 		var win, row = app.db.execute("select * from book where id = " + bookId);
 		if(row.isValidRow()){
@@ -86,18 +139,31 @@
 			backgroundColor: "#444",
 			color: "#fff",
 			width: "100%",
-			height: "15%"
+			height: "16%"
 		});
 		addButton.addEventListener("click", function(){
 			//app.scanISBN(function(isbn){
 			app.tmpisbn(function(isbn){
 				app.loadBookData(isbn, function(data){
-					app.db.execute("insert into book (isbn, title, author, publisher, thumbnail) values(?, ?, ?, ?, ?)",
-						isbn, data.title, data.author, data.publisher, data.thumbnail);
+					data.isbn = isbn;
+					app.addBookDialog(data);
 
-					data.id = app.db.lastInsertRowId;
-					var row = app.createRow(data);
-					app.tableView.insertRowBefore(0, row);
+					//app.addBookDialog(data.thumbnail, function(res){
+					//	if(res.result === true){
+					//		app.db.execute("insert into book (isbn, title, author, publisher, thumbnail, comment) values(?, ?, ?, ?, ?, ?)",
+					//			isbn, data.title, data.author, data.publisher, data.thumbnail, res.comment);
+
+					//		data.id = app.db.lastInsertRowId;
+					//		var row = app.createRow(data);
+					//		app.tableView.insertRowBefore(0, row);
+					//	}
+					//});
+					//app.db.execute("insert into book (isbn, title, author, publisher, thumbnail) values(?, ?, ?, ?, ?)",
+					//	isbn, data.title, data.author, data.publisher, data.thumbnail);
+
+					//data.id = app.db.lastInsertRowId;
+					//var row = app.createRow(data);
+					//app.tableView.insertRowBefore(0, row);
 				});
 			});
 		});
