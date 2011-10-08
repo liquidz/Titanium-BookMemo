@@ -10,10 +10,10 @@
     <id>com.uo.liquidz.BookMemo</id>
     <name>BookMemo</name>
     <version>1.0</version>
-    <publisher>masa</publisher>
+    <publisher>uochan</publisher>
     <url>http://</url>
     <description>not specified</description>
-    <copyright>2011 by masa</copyright>
+    <copyright>2011 by uochan</copyright>
     <icon>appicon.png</icon>
     <persistent-wifi>false</persistent-wifi>
     <prerendered-icon>false</prerendered-icon>
@@ -34,6 +34,10 @@
             <orientation>Ti.UI.LANDSCAPE_RIGHT</orientation>
         </orientations>
     </iphone>
-    <android xmlns:android="http://schemas.android.com/apk/res/android"/>
+    <android xmlns:android="http://schemas.android.com/apk/res/android">
+        <manifest>
+            <supports-screens android:anyDensity="false"/>
+        </manifest>
+    </android>
     <modules/>
 </ti:app>

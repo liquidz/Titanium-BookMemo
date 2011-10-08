@@ -3,20 +3,17 @@
 
 	Ti.include("js/uochan/common.js");
 
-	app = {};
+	app = {}; // global ns
+	Ti.include("util.js");
 	Ti.include("db.js");
 	Ti.include("func.js");
+	Ti.include("style.js");
 	Ti.include("ui.js");
 
-	var tabgrp = app.createTabGroup();
-	//var win = app.createMainWindow();
+	var tabgrp = app.ui.createTabGroup();
 	app.initTableView();
 
-
-	//win.open();
 	tabgrp.open();
-	
-	//app.createBookWindow(1).open();
 
 }());
 

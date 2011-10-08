@@ -1,18 +1,11 @@
 (function(){
 
-	var eachRow = function(row, fn){
-		while(row.isValidRow()){
-			fn.apply(row, [row]);
-			row.next();
-		}
-		row.close();
-	};
-
 	// {{{
 	app.tmpisbn = function(callback){
 		var arr = [
 			"978-4001156768",
-			"978-4101302720"
+			"978-4101302720",
+			"978-4798123981"
 		];
         var dialog = Ti.UI.createOptionDialog({
             title: "isbn",
@@ -20,14 +13,17 @@
         });
 
         dialog.addEventListener("click", function(ce){
-			var isbn = arr[ce.index];
-			callback(isbn.replace("-", ""));
+			if(ce.index >= 0){
+				var isbn = arr[ce.index];
+				callback(isbn.replace("-", ""));
+			}
         });
 
         dialog.show();
 	};
 	// }}}
 	
+	// =scanISBN
 	app.scanISBN = function(callback){
 		var intent = Ti.Android.createIntent({
 			action: "com.google.zxing.client.android.SCAN"
@@ -35,79 +31,39 @@
 		intent.putExtra("SCAN_MODE", "ONE_D_MODE");
 
         Ti.Android.currentActivity.startActivityForResult(intent, function(e){
-			if(e.intent){
-				var isbn = e.intent.getStringExtra("SCAN_RESULT");
-				callback(isbn.replace("-", ""));
+			if(e && uochan.isNotNull(e.intent)){
+				try {
+					var isbn = e.intent.getStringExtra("SCAN_RESULT");
+					callback(isbn.replace("-", ""));
+				} catch(ex){
+					alert("スキャンに失敗したか、QRコードスキャナがインストールされていません。スキャンし直すか、スキャナをインストール後に再度お試しください");
+				}
 			}
 		});
 	};
 
+	// =initTableView
 	app.initTableView = function(){
+		var isAppended = false;
 		app.tableView.setData([]);
-		eachRow(app.db.execute("select * from book order by updated desc, title"), function(){
-			var isbn = this.fieldByName("isbn");
-
-			var row = app.createRow({
-				id: this.fieldByName("id"),
-				isbn: this.fieldByName("isbn"),
-				title: this.fieldByName("title"),
-				author: this.fieldByName("author"),
-				thumbnail: this.fieldByName("thumbnail")
-			});
-
-            //var row = Ti.UI.createTableViewRow({
-			//	hasChild: false,
-            //    //leftImage: this.fieldByName("thumbnail"),
-            //    rowNum: this.fieldByName("id"),
-            //    //rowTitle: memo.fieldByName("title")
-			//	title: isbn
-            //});
-
-			//row.add(Ti.UI.createView({
-			//	backgroundImage: this.fieldByName("thumbnail"),
-			//	top: 0,
-			//	left: 0,
-			//	width: "40dp",
-			//	height: "60dp"
-			//}));
-
-			//row.add(Ti.UI.createLabel({
-			//	top: 0,
-			//	left: "45dp",
-			//	width: "auto", height: "auto",
-			//	font: { fontSize: "18dp" },
-			//	text: this.fieldByName("title")
-			//}));
-
-			//row.add(Ti.UI.createLabel({
-			//	top: "24dp",
-			//	left: "45dp",
-			//	width: "auto", height: "auto",
-			//	font: { fontSize: "15dp" },
-			//	text: this.fieldByName("author")
-			//}));
-
-
-            //var v = uochan.emptyView();
-            //v.add(Ti.UI.createLabel(uochan.merge(app.style.rowLabel, {
-            //    text: memo.fieldByName("title"),
-            //})));
+		app.db.eachRow(app.db.selectBook({order: "updated desc, title"}), function(){
+			var row = app.ui.createRow(app.db.getFields(this,
+					["id", "isbn", "title", "author", "comment", "publisher", "thumbnail"]));
 
             app.tableView.appendRow(row);
-
+			isAppended = true;
 		});
+
+		if(!isAppended && !Ti.App.Properties.getBool("initial_exp", false)){
+			app.util.notify("下の「本を追加」ボタンから本を追加してください。", 2000);
+			Ti.App.Properties.setBool("initial_exp", true);
+		};
 	};
 
-	var getText = function(e, name, defaultValue){
-		var target = e.getElementsByTagName(name);
-
-		return (target.length === 0) ? defaultValue : target.item(0).text;
-	};
-
-	app.loadBookData = function(isbn, callback){
+	// =loadBookData
+	app.loadBookData = function(isbn, successCallback, failCallback){
 		var xhr = Ti.Network.createHTTPClient(),
-			url = "http://books.google.com/books/feeds/volumes?q=ISBN:" + isbn,
-			query = "select * from feed where url = '" + url + "'";
+			url = "http://books.google.com/books/feeds/volumes?q=ISBN:" + isbn;
 
 		xhr.open("GET", url, false);
 		xhr.onload = function(){
@@ -116,9 +72,9 @@
 
 			if(entries.length !== 0){
 				var entry = entries.item(0),
-					title = getText(entry, "title", ""),
-					author = getText(entry, "dc:creator", ""),
-					publisher = getText(entry, "publisher", ""),
+					title = app.util.getText(entry, "title", ""),
+					author = app.util.getText(entry, "dc:creator", ""),
+					publisher = app.util.getText(entry, "publisher", ""),
 					thumbnail = "";
 
 				var link = entry.getElementsByTagName("link");
@@ -130,17 +86,65 @@
 					}
 				}
 
-				callback({
+				successCallback({
 					title: title,
 					author: author,
 					publisher: publisher,
-					thumbnail: thumbnail
+					thumbnail: (uochan.isBlank(thumbnail) ? "img/noimage.png" : thumbnail)
 				});
+			} else {
+				alert("書籍データが見つかりませんでした。");
+				failCallback();
 			}
 		};
 
-		xhr.onerror = function(err){ Ti.API.info(err); };
+		xhr.onerror = function(err){
+			alert("書籍データの読み込みに失敗しました。時間をおいてから再度お試しください。");
+			failCallback(err);
+		};
 		xhr.send();
 	};
 
+	// =share
+	app.share = function(text){
+		var intent = Ti.Android.createIntent({
+			action: Ti.Android.ACTION_SEND,
+			type: "text/plain"
+		});
+		intent.putExtra(Ti.Android.EXTRA_TEXT, text);
+
+		var chooser = Ti.Android.createIntentChooser(intent, "選択してください");
+
+		Ti.Android.currentActivity.startActivity(chooser);
+	};
+
+	// =startScanISBN
+	app.startScanISBN = function(){
+		app.scanISBN(function(isbn){
+		//app.tmpisbn(function(isbn){
+			if(app.util.isISBN(isbn)){
+				var act = Ti.UI.createActivityIndicator({ message: "読み込み中" });
+				act.show();
+	
+				app.loadBookData(isbn, function(data){
+					// success
+					act.hide();
+	
+					data.isbn = isbn;
+					app.ui.addBookDialog(data);
+				}, function(){
+					// fail
+					act.hide();
+	
+				});
+			} else {
+				app.showBarcodeGuide(function(){
+					app.startScanISBN();
+				}, true);
+			}
+		});
+	};
+
 }());
+
+
